@@ -33,4 +33,4 @@ names work identically.
 
 ## Uninstall
 
-Delete `dinput8.dll` and `skia.
+Delete `dinput8.dll` and `skia.dll`.
