@@ -5,7 +5,7 @@ with **MSDF** (Multi-channel Signed Distance Field) technology, delivering sharp
 resolution-independent text across the entire game UI — combat numbers, nameplates, 
 tooltips, chat, and more.
 
-> Drop `dinput8.dll` into your WoW root folder. No addon, no configuration file, no setup required.
+> Drop `dinput8.dll` and `skia.dll` into your WoW root folder. No addon, no configuration file, no setup required.
 
 ---
 
