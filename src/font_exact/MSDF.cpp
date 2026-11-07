@@ -157,8 +157,8 @@ namespace {
         if (!fontHandle) {
             if (IDirect3DDevice9* device = D3D::GetDevice()) {
                 constexpr float resetControl[4] = { 0, 0, 0, 0 };
+                // Only PS c23: the game never uses it. VS c23 belongs to the game's own shaders.
                 device->SetPixelShaderConstantF(MSDF::SDF_SAMPLER_SLOT, resetControl, 1);
-                device->SetVertexShaderConstantF(MSDF::SDF_SAMPLER_SLOT, resetControl, 1);
             }
             return;
         }
@@ -187,7 +187,6 @@ namespace {
             MSDF::SDF_SPREAD, MSDF::ATLAS_SIZE
         };
         device->SetPixelShaderConstantF(MSDF::SDF_SAMPLER_SLOT, controlFlag, 1);
-        device->SetVertexShaderConstantF(MSDF::SDF_SAMPLER_SLOT, controlFlag, 1);
     }
 
     void __fastcall CGxuFontRenderBatchHk(CGxuFont* pThis) {
@@ -195,7 +194,6 @@ namespace {
         if (IDirect3DDevice9* device = D3D::GetDevice()) {
             constexpr float resetControl[4] = { 0, 0, 0, 0 };
             device->SetPixelShaderConstantF(MSDF::SDF_SAMPLER_SLOT, resetControl, 1);
-            device->SetVertexShaderConstantF(MSDF::SDF_SAMPLER_SLOT, resetControl, 1);
         }
     }
 

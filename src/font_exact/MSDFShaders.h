@@ -1,8 +1,20 @@
 #pragma once
 
+// These shaders replace the game's UI shader pair, so they run for ALL UI
+// drawing (textures as well as text), not only for MSDF glyphs.
+//
+// The vertex shader must therefore be a pure passthrough and must not read
+// any constant register the game itself uses. It previously read c23 to
+// decide whether to fold the UV signs, but the game writes VS c23 constantly
+// for its own world/model shaders. A stale non-zero value there made UI
+// textures with negative texcoords (e.g. the rotated world map player arrow)
+// get abs()'d, which mirrored and stretched them.
+//
+// All MSDF decoding now happens in the pixel shader, driven by PS c23, which
+// the game never writes (Lexara resets it to zero after every font batch).
+
 inline auto* vertexShaderHLSL = R"(
 	uniform float4x4 WorldViewProj;
-	float4 control : register(c23); // font size, outline mode, spread, atlas size
 
 	struct VS_IN {
 		float4 pos  : POSITION0;
@@ -14,24 +26,13 @@ inline auto* vertexShaderHLSL = R"(
 		float4 hpos : POSITION;
 		float4 col  : COLOR0;
 		float2 uv0  : TEXCOORD0;
-		float4 pageIdx : TEXCOORD1; // target page index
 	};
 
 	VS_OUT main(VS_IN IN) {
 		VS_OUT OUT;
 		OUT.hpos = mul(IN.pos, WorldViewProj);
 		OUT.col  = IN.col;
-
-		if (control.x < 1.0f) {
-			OUT.uv0  = IN.uv0;
-			OUT.pageIdx = float4(0, 0, 0, 1.0f);
-		} else {
-			// encoded sign bits
-			float bit0 = (IN.uv0.x < 0.0f) ? 1.0f : 0.0f;
-			float bit1 = (IN.uv0.y < 0.0f) ? 2.0f : 0.0f;
-			OUT.pageIdx = float4(bit0 + bit1, 0, 0, 0);
-			OUT.uv0 = abs(IN.uv0);
-		}
+		OUT.uv0  = IN.uv0; // untouched: signed UVs are decoded in the pixel shader
 		return OUT;
 	}
 )";
@@ -49,7 +50,6 @@ inline auto* pixelShaderHLSL = R"(
 	struct PS_IN {
 		float4 col : COLOR0;
 		float2 uv0 : TEXCOORD0;
-		float4 pageIdx : TEXCOORD1; // target page index
 	};
 
 	float median(float r, float g, float b) {
@@ -59,7 +59,14 @@ inline auto* pixelShaderHLSL = R"(
 	float4 main(PS_IN IN) : COLOR {
 		if (control.x < 1.0f) return tex2D(gameTexture, IN.uv0) * IN.col;
 
-		float2 uv = IN.uv0;
+		// MSDF glyph: the atlas page is encoded in the UV sign bits.
+		// All four vertices of a glyph quad share the same signs, so the
+		// interpolated value keeps them.
+		float bit0 = (IN.uv0.x < 0.0f) ? 1.0f : 0.0f;
+		float bit1 = (IN.uv0.y < 0.0f) ? 2.0f : 0.0f;
+		int atlasPage = int(bit0 + bit1 + 0.5f);
+
+		float2 uv = abs(IN.uv0);
 
 		float outlineHint = control.y;
 		float fontSize = control.x;
@@ -70,8 +77,6 @@ inline auto* pixelShaderHLSL = R"(
 		} else if (outlineHint >= 0.5f) {
 			outlinePx = max(1.50f, pow(fontSize, 0.075f) * 1.5f);
 		}
-
-		int atlasPage = int(IN.pageIdx.x + 0.5f);
 
 		float4 sample;
 		if (atlasPage == 0) sample = tex2D(sdfAtlas0, uv);
